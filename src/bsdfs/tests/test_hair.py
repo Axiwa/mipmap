@@ -11,33 +11,47 @@ def test01_create(variant_scalar_rgb):
     assert b.flags(1) == (mi.BSDFFlags.GlossyTransmission | mi.BSDFFlags.FrontSide | mi.BSDFFlags.BackSide | mi.BSDFFlags.NonSymmetric)
     assert b.flags() == b.flags(0) | b.flags(1)
     params = traverse(b)
-    print (params)
 
 
-# def test02_eval_pdf(variant_scalar_rgb):
-#     bsdf = mi.load_dict({'type': 'diffuse'})
+def test02_eval_pdf(variant_scalar_rgb):
+    sampler = mi.load_dict({'type': 'independent'})
 
-#     si    = mi.SurfaceInteraction3f()
-#     si.p  = [0, 0, 0]
-#     si.n  = [0, 0, 1]
-#     si.wi = [0, 0, 1]
-#     si.sh_frame = mi.Frame3f(si.n)
+    si    = mi.SurfaceInteraction3f()
+    si.p  = [0, 0, 0]
+    si.n  = [0, 0, 1]
+    si.wi = mi.warp.square_to_uniform_sphere(sampler.next_2d())
+    si.sh_frame = mi.Frame3f(si.n)
+    si.uv = [0, 1] # h = 1
 
-#     ctx = mi.BSDFContext()
+    ctx = mi.BSDFContext()
 
-#     for i in range(20):
-#         theta = i / 19.0 * (dr.pi / 2)
-#         wo = [dr.sin(theta), 0, dr.cos(theta)]
+    beta_m = 0.1
+    beta_n = 0.1
+    total = 100000
+    while(beta_m < 1):
+        while(beta_n < 1):
+            # estimate reflected uniform incident radiance from hair
+            count = total
+            sum = 0.
+            while(count > 0):
+                h = -1 + 0.2 * sampler.next_1d()
+                sigma_a = 0.
+                bsdf = mi.load_dict({        
+                    'type': 'hair',
+                    'sigma_a': sigma_a,
+                    'beta_m': beta_m,
+                    'beta_n': beta_n,
+                    'alpha': 0.,
+                    'eta': 1.55,
+                    'h': h})
+                wo = mi.warp.square_to_uniform_sphere(sampler.next_2d())
+                sum += bsdf.eval(ctx, si, wo)
+                count -= 1
+            beta_n += 0.2
+        beta_m += 0.2
+    avg = sum[1] / (total * mi.warp.square_to_uniform_sphere_pdf(1.))
 
-#         v_pdf  = bsdf.pdf(ctx, si, wo=wo)
-#         v_eval = bsdf.eval(ctx, si, wo=wo)[0]
-#         assert dr.allclose(v_pdf, wo[2] / dr.pi)
-#         assert dr.allclose(v_eval, 0.5 * wo[2] / dr.pi)
-
-#         v_eval_pdf = bsdf.eval_pdf(ctx, si, wo=wo)
-#         assert dr.allclose(v_eval, v_eval_pdf[0])
-#         assert dr.allclose(v_pdf, v_eval_pdf[1])
-
+    assert dr.allclose(avg, 1)
 
 # def test03_chi2(variants_vec_backends_once_rgb):
 #     from mitsuba.chi2 import BSDFAdapter, ChiSquareTest, SphericalDomain

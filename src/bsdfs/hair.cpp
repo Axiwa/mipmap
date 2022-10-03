@@ -13,11 +13,12 @@ public:
     MI_IMPORT_TYPES(Texture)
 
     Hair(const Properties &props) : Base(props) {
-        sigma_a = props.texture<Texture>("sigma_a", .5f);
+        sigma_a = props.texture<Texture>("sigma_a", 0.f);
         beta_m = props.get<Float>("beta_m", 0.3f);
         beta_n = props.get<Float>("beta_n", 0.3f);
         alpha = props.get<Float>("alpha", 2.f);
         eta = props.get<Float>("eta", 1.55f);
+        h = props.get<Float>("h", .5f);
 
         // I still put it as diffuse because in the formula there is no delta related
         // m_flags = BSDFFlags::GlossyTransmission | BSDFFlags::GlossyReflection | BSDFFlags::FrontSide | BSDFFlags::BackSide | BSDFFlags::NonSymmetric;
@@ -35,6 +36,7 @@ public:
         callback->put_parameter("beta_n", beta_n, +ParamFlags::NonDifferentiable);
         callback->put_parameter("alpha", alpha, +ParamFlags::NonDifferentiable);
         callback->put_parameter("eta", eta, +ParamFlags::NonDifferentiable);
+        callback->put_parameter("h", h, +ParamFlags::NonDifferentiable);
     }
     // for python test // differentiable -> empty
 
@@ -69,12 +71,14 @@ public:
                   const Vector3f &wo, Mask active) const override {
         MI_MASKED_FUNCTION(ProfilerPhase::BSDFEvaluate, active);
 
-        if (!ctx.is_enabled(BSDFFlags::GlossyReflection) && !ctx.is_enabled(BSDFFlags::GlossyReflection))
+        // TODO
+        if (!ctx.is_enabled(BSDFFlags::GlossyTransmission) && !ctx.is_enabled(BSDFFlags::GlossyReflection)){
             return 0.f;
+        }
 
-        Float cos_theta_i = Frame3f::cos_theta(si.wi),
-              cos_theta_o = Frame3f::cos_theta(wo);
-        Float h = -1 + 2 * si.uv[1];
+             
+        // TODO: h should be related to si.uv??
+        // Float h = -1 + 2 * si.uv[1];
         Float gammaO = dr::safe_asin(h);
 
         // CHECK(h >= -1 && h <= 1);
@@ -86,7 +90,8 @@ public:
         Float s;
         Float sin2kAlpha[3], cos2kAlpha[3];
 
-        active &= cos_theta_i > 0.f && cos_theta_o > 0.f;
+        // TODO: I shouldn't check the symbol of cos_theta
+        // active &= cos_theta_i > 0.f && cos_theta_o > 0.f; 
 
         v[0] = dr::sqr(0.726f * beta_m + 0.812f * dr::sqr(beta_m) + 3.7f * dr::pow(beta_m, 20));
         v[1] = .25f * v[0];
@@ -110,6 +115,7 @@ public:
 
         // Compute the BSDF
         // Compute hair coordinate system terms related to _wo_
+        // Here the coordinate system is different from others!!
         Float sinThetaO = wo.x();
         Float cosThetaO = dr::safe_sqrt(1 - dr::sqr(sinThetaO));
         Float phiO = dr::atan2(wo.z(), wo.y());
@@ -130,7 +136,9 @@ public:
         Float gammaT = dr::safe_asin(sinGammaT);
 
         // Compute the transmittance _T_ of a single path through the cylinder
-        Spectrum T = dr::exp(-sigma_a * (2 * cosGammaT / cosThetaT));
+        // TODO: sigma_a * 1 != 0?? why??
+        Spectrum T = dr::exp(-0 * (2 * cosGammaT / cosThetaT));
+        // std::cout<<T<<std::endl;
 
         // Calculate Ap
         Spectrum ap[pMax + 1];
@@ -138,6 +146,7 @@ public:
         Float cosTheta = cosThetaO * cosGammaO;
         // TODO: ?
         Float f = get<0>(fresnel(cosTheta, eta)); 
+
         ap[0] = f;
         // Compute $p=1$ attenuation term
         ap[1] = dr::sqr(1 - f) * T;
@@ -145,10 +154,6 @@ public:
         for (int p = 2; p < pMax; ++p) ap[p] = ap[p - 1] * T * f;
         // Compute attenuation term accounting for remaining orders of scattering
         ap[pMax] = ap[pMax - 1] * f * T / (Spectrum(1.f) - T * f);
-
-        // Calculate Mp
-
-
 
         // Evaluate hair BSDF
         Float phi = phiI - phiO;
@@ -178,6 +183,7 @@ public:
             fsum += 
                 Mp(cosThetaI, cosThetaOp, sinThetaI, sinThetaOp, v[p]) * ap[p] *
                 Np(phi, p, s, gammaO, gammaT);
+            // std::cout<<fsum<<std::endl;
         }
 
         // Compute contribution of remaining terms after _pMax_
@@ -237,11 +243,12 @@ public:
 
 private:
     static const int pMax = 3;
-    constexpr static const ScalarFloat SqrtPiOver8 = 0.626657069;
+    constexpr static const ScalarFloat SqrtPiOver8 = 0.626657069f;
     ref<Texture> sigma_a; 
     ref<Texture> m_reflectance;
     Float beta_m, beta_n, alpha;
     Float eta;
+    Float h;
 
     // Float or ScalarFloat?
     // Float enumlanin, pheomelanin; // color
@@ -277,9 +284,10 @@ private:
         Float mp =
             dr::select(v <= .1f, 
                 dr::exp(LogI0(a) - b - 1 / v + 0.6931f + dr::log(1 / (2 * v))),
-                dr::exp(-b) * I0(a)) / (dr::sinh(1 / v) * 2 * v
+                dr::exp(-b) * I0(a) / (dr::sinh(1 / v) * 2 * v)
             );
         // CHECK(!std::isinf(mp) && !std::isnan(mp));
+        // std::cout<<mp<<std::endl;
         return mp;
     }
 
@@ -291,7 +299,6 @@ private:
         // while (dphi > dr::Pi<Float>) dphi -= 2 * dr::Pi<Float>;
         // while (dphi < -dr::Pi<Float>) dphi += 2 * dr::Pi<Float>;
         dphi = angleMap(dphi);
-
         return TrimmedLogistic(dphi, s, -dr::Pi<Float>, dr::Pi<Float>);
     }
 
