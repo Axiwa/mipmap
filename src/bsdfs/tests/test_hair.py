@@ -27,7 +27,7 @@ def test02_eval_pdf(variant_scalar_rgb):
 
     beta_m = 0.1
     beta_n = 0.1
-    total = 100000
+    total = 10
     while(beta_m < 1):
         while(beta_n < 1):
             # estimate reflected uniform incident radiance from hair
@@ -51,7 +51,7 @@ def test02_eval_pdf(variant_scalar_rgb):
         beta_m += 0.2
     avg = sum[1] / (total * mi.warp.square_to_uniform_sphere_pdf(1.))
 
-    assert dr.allclose(avg, 1)
+    assert dr.allclose(avg, 1, atol=0.01)
 
 # def test03_chi2(variants_vec_backends_once_rgb):
 #     from mitsuba.chi2 import BSDFAdapter, ChiSquareTest, SphericalDomain

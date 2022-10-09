@@ -136,9 +136,8 @@ public:
         Float gammaT = dr::safe_asin(sinGammaT);
 
         // Compute the transmittance _T_ of a single path through the cylinder
-        // TODO: sigma_a * 1 != 0?? why??
-        Spectrum T = dr::exp(-0 * (2 * cosGammaT / cosThetaT));
-        // std::cout<<T<<std::endl;
+        Spectrum T = dr::exp(-sigma_a -> eval(si, active) * (2 * cosGammaT / cosThetaT));
+
 
         // Calculate Ap
         Spectrum ap[pMax + 1];
