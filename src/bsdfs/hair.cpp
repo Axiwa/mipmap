@@ -75,7 +75,7 @@ public:
         Float sinThetaI = wi.x();
         Float cosThetaI = dr::safe_sqrt(1 - dr::sqr(sinThetaI));
         Float phiI = dr::atan2(wi.z(), wi.y());
-        Float gammaO = dr::safe_asin(h);
+        Float gammaI = dr::safe_asin(h);
 
         BSDFSample3f bs = dr::zeros<BSDFSample3f>();
 
@@ -130,7 +130,7 @@ public:
         Float sinGammaT = h / etap;
         Float gammaT = dr::safe_asin(sinGammaT);
         Float dphi;
-        Float Phi = 2 * p * gammaT - 2 * gammaO + p * dr::Pi<ScalarFloat>;
+        Float Phi = 2 * p * gammaT - 2 * gammaI + p * dr::Pi<ScalarFloat>;
 
         if (p < pMax)
             dphi =
@@ -167,7 +167,7 @@ public:
 
             // Handle out-of-range $\cos \thetao$ from scale adjustment
             cosThetaIp = dr::abs(cosThetaIp);
-            pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) * apPdf[p] * Np(dphi, p, s, gammaO, gammaT);
+            pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) * apPdf[p] * Np(dphi, p, s, gammaI, gammaT);
         }
 
         pdf += Mp(cosThetaO, cosThetaI, sinThetaO, sinThetaI, v[pMax]) *
@@ -195,7 +195,7 @@ public:
 
         // TODO: h should be related to si.uv
         Float h = -1 + 2 * si.uv[1];
-        Float gammaO = dr::safe_asin(h);
+        Float gammaI = dr::safe_asin(h);
 
         // CHECK(h >= -1 && h <= 1);
         // CHECK(m_beta_m >= 0 && m_beta_m <= 1);
@@ -270,7 +270,7 @@ public:
             cosThetaIp = dr::abs(cosThetaIp);
             fsum += 
                 Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) * ap[p] *
-                Np(phi, p, s, gammaO, gammaT);
+                Np(phi, p, s, gammaI, gammaT);
         }
 
         // Compute contribution of remaining terms after _pMax_
@@ -299,7 +299,7 @@ public:
         Float sinThetaI = si.wi.x();
         Float cosThetaI = dr::safe_sqrt(1 - dr::sqr(sinThetaI));
         Float phiI = dr::atan2(si.wi.z(), si.wi.y());
-        Float gammaO = dr::safe_asin(h);
+        Float gammaI = dr::safe_asin(h);
 
         // Compute $\gammat$ for refracted ray
         Float etap = dr::sqrt(m_eta * m_eta - dr::sqr(sinThetaI)) / cosThetaI;
@@ -336,7 +336,7 @@ public:
             // Handle out-of-range $\cos \thetao$ from scale adjustment
             cosThetaIp = dr::abs(cosThetaIp);
             pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) *
-                apPdf[p] * Np(phi, p, s, gammaO, gammaT);
+                apPdf[p] * Np(phi, p, s, gammaI, gammaT);
         }
         pdf += Mp(cosThetaO, cosThetaI, sinThetaO, sinThetaI, v[pMax]) *
             apPdf[pMax] * (1 / (2 * dr::Pi<ScalarFloat>));
@@ -364,7 +364,7 @@ public:
         Float sinThetaI = si.wi.x();
         Float cosThetaI = dr::safe_sqrt(1 - dr::sqr(sinThetaI));
         Float phiI = dr::atan2(si.wi.z(), si.wi.y());
-        Float gammaO = dr::safe_asin(h);
+        Float gammaI = dr::safe_asin(h);
 
         // Compute $\gammat$ for refracted ray
         Float etap = dr::sqrt(m_eta * m_eta - dr::sqr(sinThetaI)) / cosThetaI;
@@ -427,10 +427,10 @@ public:
             cosThetaIp = dr::abs(cosThetaIp);
 
             pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) *
-                apPdf[p] * Np(phi, p, s, gammaO, gammaT);
+                apPdf[p] * Np(phi, p, s, gammaI, gammaT);
             fsum += 
                 Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) * ap[p] *
-                Np(phi, p, s, gammaO, gammaT);
+                Np(phi, p, s, gammaI, gammaT);
         }
         pdf += Mp(cosThetaO, cosThetaI, sinThetaO, sinThetaI, v[pMax]) *
             apPdf[pMax] * (1 / (2 * dr::Pi<ScalarFloat>));
@@ -501,8 +501,8 @@ private:
         return mp;
     }
 
-    static Float Np(Float phi, int p, Float s, Float gammaO, Float gammaT) {
-        Float Phi = 2 * p * gammaT - 2 * gammaO + p * dr::Pi<ScalarFloat>;
+    static Float Np(Float phi, int p, Float s, Float gammaI, Float gammaT) {
+        Float Phi = 2 * p * gammaT - 2 * gammaI + p * dr::Pi<ScalarFloat>;
         Float dphi = phi - Phi;
 
         dphi = angleMap(dphi);
