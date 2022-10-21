@@ -66,7 +66,7 @@ public:
 
         MI_MASKED_FUNCTION(ProfilerPhase::BSDFSample, active);
 
-        Float pdf = (Float)0;
+        Float _pdf = (Float)0;
         Vector3f wi = si.wi;
         Vector3f wo;
         Float h = -1 + 2 * si.uv[1];
@@ -167,14 +167,14 @@ public:
 
             // Handle out-of-range $\cos \thetao$ from scale adjustment
             cosThetaIp = dr::abs(cosThetaIp);
-            pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) * apPdf[p] * Np(dphi, p, s, gammaI, gammaT);
+            _pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) * apPdf[p] * Np(dphi, p, s, gammaI, gammaT);
         }
 
-        pdf += Mp(cosThetaO, cosThetaI, sinThetaO, sinThetaI, v[pMax]) *
+        _pdf += Mp(cosThetaO, cosThetaI, sinThetaO, sinThetaI, v[pMax]) *
                 apPdf[pMax] * (1 / (2 * dr::Pi<ScalarFloat>));
 
         bs.wo = wo;
-        bs.pdf = pdf;
+        bs.pdf = _pdf;
         bs.eta = 1.;
         bs.sampled_type = +BSDFFlags::Glossy;
         bs.sampled_component = 0;        
@@ -311,7 +311,7 @@ public:
 
         // Compute PDF sum for hair scattering events
         Float phi = phiO - phiI;
-        Float pdf = (Float)0;
+        Float _pdf = (Float)0;
 
         for (int p = 0; p < pMax; ++p) {
             // Compute $\sin \thetao$ and $\cos \thetao$ terms accounting for scales
@@ -335,12 +335,12 @@ public:
 
             // Handle out-of-range $\cos \thetao$ from scale adjustment
             cosThetaIp = dr::abs(cosThetaIp);
-            pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) *
+            _pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) *
                 apPdf[p] * Np(phi, p, s, gammaI, gammaT);
         }
-        pdf += Mp(cosThetaO, cosThetaI, sinThetaO, sinThetaI, v[pMax]) *
+        _pdf += Mp(cosThetaO, cosThetaI, sinThetaO, sinThetaI, v[pMax]) *
             apPdf[pMax] * (1 / (2 * dr::Pi<ScalarFloat>));
-        return pdf;
+        return _pdf;
     }
 
 
