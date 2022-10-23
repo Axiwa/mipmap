@@ -3,15 +3,15 @@ import drjit as dr
 import mitsuba as mi
 from mitsuba.python.util import traverse
 
-# def test01_create():
-#     mi.set_variant('cuda_ad_rgb')
-#     b = mi.load_dict({'type': 'hair'})
-#     assert b is not None
-#     assert b.component_count() == 1
-#     assert b.flags(0) == (mi.BSDFFlags.Glossy | mi.BSDFFlags.FrontSide | mi.BSDFFlags.BackSide | mi.BSDFFlags.NonSymmetric)
-#     assert b.flags() == b.flags(0)
-#     params = traverse(b)
-#     print (params)
+def test01_create():
+    mi.set_variant('llvm_ad_rgb')
+    b = mi.load_dict({'type': 'hair'})
+    assert b is not None
+    assert b.component_count() == 1
+    assert b.flags(0) == (mi.BSDFFlags.Glossy | mi.BSDFFlags.FrontSide | mi.BSDFFlags.BackSide | mi.BSDFFlags.NonSymmetric)
+    assert b.flags() == b.flags(0)
+    params = traverse(b)
+    print (params)
 
 
 # def test02_white_furnace(variant_scalar_rgb):
@@ -29,6 +29,7 @@ from mitsuba.python.util import traverse
 #     beta_n = 0.1
 #     total = 300000
 #     while(beta_m < 1):
+#         beta_n = 0.1
 #         while(beta_n < 1):
 #             # estimate reflected uniform incident radiance from hair
 #             count = total
@@ -55,7 +56,7 @@ from mitsuba.python.util import traverse
 #         beta_m += 0.2
 
 
-# def test03_white_furnace_sample(variant_scalar_rgb):
+# def test03_white_furnace_importance_sample(variant_scalar_rgb):
 #     sampler = mi.load_dict({'type': 'independent'})
 
 #     si    = mi.SurfaceInteraction3f()
@@ -63,13 +64,13 @@ from mitsuba.python.util import traverse
 #     si.n  = [0, 0, 1]
 #     si.sh_frame = mi.Frame3f(si.n)
 #     si.wi = mi.warp.square_to_uniform_sphere(sampler.next_2d())
-
 #     ctx = mi.BSDFContext()
 
 #     beta_m = 0.1
 #     beta_n = 0.1
 #     total = 100000
 #     while(beta_m < 1):
+#         beta_n = 0.1
 #         while(beta_n < 1):
 #             # estimate reflected uniform incident radiance from hair
 #             count = total
@@ -86,6 +87,7 @@ from mitsuba.python.util import traverse
 #                     'eta': 1.55,
 #                 })
 #                 bs, spec = bsdf.sample(ctx, si, sampler.next_1d(), sampler.next_2d())
+#                 pdf = bsdf.pdf(ctx, si, bs.wo)
 #                 sum += spec
 #                 count -= 1
 #             avg = sum.y / (total)
@@ -95,8 +97,9 @@ from mitsuba.python.util import traverse
 
 
 # def test04_sample_numeric(variants_vec_backends_once_rgb):
+#     mi.set_variant('llvm_ad_rgb')
 #     sampler = mi.load_dict({'type': 'independent', 'sample_count': 10000})
-#     sampler.seed(seed = 0, wavefront_size=10000)
+#     sampler.seed(seed = 0, wavefront_size = 10000)
 
 #     si    = mi.SurfaceInteraction3f()
 #     si.p  = [0, 0, 0]
@@ -109,6 +112,7 @@ from mitsuba.python.util import traverse
 #     beta_n = 0.1
 #     total = 128
 #     while(beta_m < 1):
+#         beta_n = 0.1
 #         while(beta_n < 1):
 #             # estimate reflected uniform incident radiance from hair
             
@@ -133,8 +137,9 @@ from mitsuba.python.util import traverse
 
 
 # def test04_sample_pdf(variants_vec_backends_once_rgb):
-#     sampler = mi.load_dict({'type': 'independent', 'sample_count': 30000})
-#     sampler.seed(seed = 0, wavefront_size=10000)
+#     mi.set_variant('llvm_ad_rgb')
+#     sampler = mi.load_dict({'type': 'independent', 'sample_count': 10000})
+#     sampler.seed(seed = 2, wavefront_size = 10000)
 
 #     si    = mi.SurfaceInteraction3f()
 #     si.p  = [0, 0, 0]
@@ -147,6 +152,7 @@ from mitsuba.python.util import traverse
 #     beta_n = 0.1
 #     total = 30000
 #     while(beta_m < 1):
+#         beta_n = 0.1
 #         while(beta_n < 1):
 #             # estimate reflected uniform incident radiance from hair
 #             si.uv = [0, sampler.next_1d()]
@@ -156,7 +162,7 @@ from mitsuba.python.util import traverse
 #                 'sigma_a': sigma_a,
 #                 'beta_m': beta_m,
 #                 'beta_n': beta_n,
-#                 'alpha': 0.,
+#                 'alpha': 2.,
 #                 'eta': 1.55
 #                 })
 #             si.wi = mi.warp.square_to_uniform_sphere(sampler.next_2d())
@@ -174,15 +180,13 @@ from mitsuba.python.util import traverse
 #             beta_n += 0.2
 #         beta_m += 0.2
 
-
-
-# def test05_sampleConsistency(variants_vec_backends_once_rgb):
-
+# def test05_sampleConsistency():
+#     mi.set_variant('llvm_ad_rgb')
 #     def helper_Li(spec):
 #         return spec.z * spec.z
 
-#     sampler = mi.load_dict({'type': 'independent', 'sample_count': 64 * 1024})
-#     sampler.seed(seed = 0, wavefront_size = 64 * 1024)
+#     sampler = mi.load_dict({'type': 'independent', 'sample_count': 128 * 1024})
+#     sampler.seed(seed = 0, wavefront_size = 128 * 1024)
 
 #     si    = mi.SurfaceInteraction3f()
 #     si.p  = [0, 0, 0]
@@ -196,6 +200,7 @@ from mitsuba.python.util import traverse
 #     beta_n = 0.1
 #     total = 64 * 1024
 #     while(beta_m < 1):
+#         beta_n = 0.1
 #         while(beta_n < 1):
 
 #             si.wi = mi.warp.square_to_uniform_sphere(sampler.next_2d())
@@ -209,7 +214,7 @@ from mitsuba.python.util import traverse
 #                 'sigma_a': sigma_a,
 #                 'beta_m': beta_m,
 #                 'beta_n': beta_n,
-#                 'alpha': 0.,
+#                 'alpha': 2.,
 #                 'eta': 1.55,
 #                 })
 
@@ -231,29 +236,17 @@ from mitsuba.python.util import traverse
 from mitsuba.chi2 import BSDFAdapter, ChiSquareTest, SphericalDomain
 
 
-def BSDFAdapterUV(bsdf_type, extra, u = 0.6, wi=[0, 0, 1], ctx=None):
-    sampler = mi.load_dict({'type': 'independent'})
-    """
-    Adapter to test BSDF sampling using the Chi^2 test.
-
-    Parameter ``bsdf_type`` (string):
-        Name of the BSDF plugin to instantiate.
-
-    Parameter ``extra`` (string):
-        Additional XML used to specify the BSDF's parameters.
-
-    Parameter ``wi`` (array(3,)):
-        Incoming direction, in local coordinates.
-    """
-
+def BSDFAdapterUV(bsdf_type, extra, u = 0.5, wi=[0, 0, 1], ctx=None):
     if ctx is None:
         ctx = mi.BSDFContext()
 
     def make_context(n):
         si = dr.zeros(mi.SurfaceInteraction3f, n)
+        si.p  = [0, 0, 0]
+        si.n  = [0, 0, 1]
         si.sh_frame = mi.Frame3f(si.n)
         si.uv = [0, u]
-        si.wi = dr.normalize(mi.ScalarVector3f(0.8, 0.3, 0.05))
+        si.wi = wi
         return (si, ctx)
 
     def instantiate(args):
@@ -282,30 +275,40 @@ def BSDFAdapterUV(bsdf_type, extra, u = 0.6, wi=[0, 0, 1], ctx=None):
     return sample_functor, pdf_functor
 
 
-def test06_chi2(variants_vec_backends_once_rgb):
-
+def test06_chi2():
+    mi.set_variant('llvm_ad_rgb')
+    sampler = mi.load_dict({'type': 'independent', 'sample_count': 1})
+    sampler.seed(seed = 0, wavefront_size = 1)
     sigma_a = 0
-    beta_m = 1
-    beta_n = 0.4
-    alpha = 2
+    alpha = 0
     eta = 1.55
-    
-    xml = f"""<float name="alpha" value="{alpha}" />
-			<rgb name="sigma_a" value="{sigma_a}"/>
-			<float name="beta_m" value="{beta_m}" />
-			<float name="beta_n" value="{beta_n}" />
-			<float name="eta" value="{eta}" />
-          """
 
-    sample_func, pdf_func = BSDFAdapterUV("hair", xml)
+    beta_m = 0.6
+    beta_n = 0.8
 
-    chi2 = ChiSquareTest(
-        domain=SphericalDomain(),
-        sample_func=sample_func,
-        pdf_func=pdf_func,
-        sample_dim = 3,
-        sample_count = 1,
-        ires = 2
-    )
+    while(beta_m <= 1):
+        beta_n = 0.8
+        while(beta_n <= 1):
+            xml = f"""<float name="alpha" value="{alpha}" />
+                    <rgb name="sigma_a" value="{sigma_a}"/>
+                    <float name="beta_m" value="{beta_m}" />
+                    <float name="beta_n" value="{beta_n}" />
+                    <float name="eta" value="{eta}" />
+                """
+            wi = mi.warp.square_to_uniform_sphere(sampler.next_2d())
+            u = 0.25 + 0.5 * sampler.next_1d()
+            sample_func, pdf_func = BSDFAdapterUV("hair", xml, u=u, wi=wi)
 
-    assert chi2.run()
+            chi2 = ChiSquareTest(
+                domain=SphericalDomain(),
+                sample_func=sample_func,
+                pdf_func=pdf_func,
+                sample_dim = 3,
+                res = 256,
+                ires = 16,
+                seed = 4,
+            )
+            assert chi2.run()
+
+            beta_n += 0.2
+        beta_m += 0.2

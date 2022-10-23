@@ -4,6 +4,7 @@
 #include <mitsuba/render/bsdf.h>
 #include <mitsuba/render/texture.h>
 #include <mitsuba/render/fresnel.h>
+#include <fstream>
 
 NAMESPACE_BEGIN(mitsuba)
 
@@ -60,7 +61,7 @@ public:
 
     std::pair<BSDFSample3f, Spectrum> sample(const BSDFContext &ctx,
                                              const SurfaceInteraction3f &si,
-                                             Float /* sample1 */,
+                                             Float sample1,
                                              const Point2f &sample2,
                                              Mask active) const override {
 
@@ -79,45 +80,54 @@ public:
 
         BSDFSample3f bs = dr::zeros<BSDFSample3f>();
 
-        Point2f u[2] = {DemuxFloat(sample2[0]), DemuxFloat(sample2[1])};
+        Point2f u[2] = {DemuxFloat(sample1), sample2};
 
         // Determine which term $p$ to sample for hair scattering
         dr::Array<Float, pMax + 1> apPdf = ComputeApPdf(cosThetaI, si, active);
 
-        ScalarInt8 p = 0;
-        ScalarInt8 i = 0;
-        Mask cert = true;
-        dr::Loop<Mask> loop("select p", cert, i, p, apPdf, u);
 
-        while(loop(cert)){
-            p = i;
-            cert &= (u[0][0] >= apPdf[i]);
-            u[0][0] -= apPdf[p];
+        // std::cout<<apPdf[0]<<" "<<apPdf[1]<<" "<<apPdf[2]<<" "<<apPdf[3]<<std::endl;
+
+        Int32 p = (Int32)-1;
+        ScalarInt32 i = 0;
+
+        while(i < pMax){
+            p = dr::select(u[0][0] >= apPdf[i], i, p);
+            u[0][0] -= apPdf[i];
             i++;
-            cert &= (i <= pMax);
         }
+        p++;
+        // std::cout<<dr::count(dr::eq(p, 0))<<std::endl;
+        // std::cout<<dr::count(dr::eq(p, 1))<<std::endl;
+        // std::cout<<dr::count(dr::eq(p, 2))<<std::endl;
+        // std::cout<<dr::count(dr::eq(p, 3))<<std::endl;
 
         // Rotate $\sin \thetao$ and $\cos \thetao$ to account for hair scale tilt
-        Float sinThetaIp, cosThetaIp;
-        if (p == 0) {
-            sinThetaIp = sinThetaI * cos2kAlpha[1] - cosThetaI * sin2kAlpha[1];
-            cosThetaIp = cosThetaI * cos2kAlpha[1] + sinThetaI * sin2kAlpha[1];
-        }
-        else if (p == 1) {
-            sinThetaIp = sinThetaI * cos2kAlpha[0] + cosThetaI * sin2kAlpha[0];
-            cosThetaIp = cosThetaI * cos2kAlpha[0] - sinThetaI * sin2kAlpha[0];
-        } else if (p == 2) {
-            sinThetaIp = sinThetaI * cos2kAlpha[2] + cosThetaI * sin2kAlpha[2];
-            cosThetaIp = cosThetaI * cos2kAlpha[2] - sinThetaI * sin2kAlpha[2];
-        } else {
-            sinThetaIp = sinThetaI;
-            cosThetaIp = cosThetaI;
-        }
+        Float sinThetaIp = sinThetaI;
+        Float cosThetaIp = cosThetaI;
+
+        // if (p == 0) {
+        sinThetaIp = dr::select(dr::eq(p ,0), sinThetaI * cos2kAlpha[1] - cosThetaI * sin2kAlpha[1], sinThetaIp);
+        cosThetaIp = dr::select(dr::eq(p ,0), cosThetaI * cos2kAlpha[1] + sinThetaI * sin2kAlpha[1], cosThetaIp);
+        // }
+        // else if (p == 1) {
+        sinThetaIp = dr::select(dr::eq(p ,1), sinThetaI * cos2kAlpha[0] + cosThetaI * sin2kAlpha[0], sinThetaIp);
+        cosThetaIp = dr::select(dr::eq(p ,1), cosThetaI * cos2kAlpha[0] - sinThetaI * sin2kAlpha[0], cosThetaIp);
+        // } 
+        // else if (p == 2) {
+        sinThetaIp = dr::select(dr::eq(p ,2), sinThetaI * cos2kAlpha[2] + cosThetaI * sin2kAlpha[2], sinThetaIp);
+        cosThetaIp = dr::select(dr::eq(p ,2), cosThetaI * cos2kAlpha[2] - sinThetaI * sin2kAlpha[2], cosThetaIp);
+        // } 
 
         // Sample $M_p$ to compute $\thetai$
         u[1][0] = dr::maximum(u[1][0], Float(1e-5));
+
         Float cosTheta =
-            1 + v[p] * dr::log(u[1][0] + (1 - u[1][0]) * dr::exp(-2 / v[p]));
+            1 + v[pMax] * dr::log(u[1][0] + (1 - u[1][0]) * dr::exp(-2 / v[pMax]));
+        for(int i = 0; i < pMax; i++){
+            cosTheta = dr::select(dr::eq(p, i), 1 + v[i] * dr::log(u[1][0] + (1 - u[1][0]) * dr::exp(-2 / v[i])), cosTheta);
+        }
+
         Float sinTheta = dr::safe_sqrt(1 - dr::sqr(cosTheta));
         Float cosPhi = dr::cos(2 * dr::Pi<ScalarFloat> * u[1][1]);
         Float sinThetaO = -cosTheta * sinThetaIp + sinTheta * cosPhi * cosThetaIp;
@@ -132,11 +142,14 @@ public:
         Float dphi;
         Float Phi = 2 * p * gammaT - 2 * gammaI + p * dr::Pi<ScalarFloat>;
 
-        if (p < pMax)
-            dphi =
-                Phi + SampleTrimmedLogistic(u[0][1], s, -dr::Pi<ScalarFloat>, dr::Pi<ScalarFloat>);
-        else
-            dphi = 2 * dr::Pi<ScalarFloat> * u[0][1];
+        // if (p < pMax)
+        //     dphi =
+        //         Phi + SampleTrimmedLogistic(u[0][1], s, -dr::Pi<ScalarFloat>, dr::Pi<ScalarFloat>);
+        // else
+        //     dphi = 2 * dr::Pi<ScalarFloat> * u[0][1];
+        dphi = dr::select(dr::neq(p, pMax), 
+        Phi + SampleTrimmedLogistic(u[0][1], s, -dr::Pi<ScalarFloat>, dr::Pi<ScalarFloat>), 
+        2 * dr::Pi<ScalarFloat> * u[0][1]);
 
         // Compute _wi_ from sampled hair scattering angles
         Float phiO = phiI + dphi;
@@ -145,19 +158,18 @@ public:
                     cosThetaO * dr::sin(phiO));
 
         // Compute PDF for sampled hair scattering direction _wi_
-        for (int p = 0; p < pMax; ++p) {
+        for (int i = 0; i < pMax; ++i) {
             // Compute $\sin \thetao$ and $\cos \thetao$ terms accounting for scales
             Float sinThetaIp, cosThetaIp;
-            if (p == 0) {
+            if (i == 0) {
                 sinThetaIp = sinThetaI * cos2kAlpha[1] - cosThetaI * sin2kAlpha[1];
                 cosThetaIp = cosThetaI * cos2kAlpha[1] + sinThetaI * sin2kAlpha[1];
             }
-
             // Handle remainder of $p$ values for hair scale tilt
-            else if (p == 1) {
+            else if (i == 1) {
                 sinThetaIp = sinThetaI * cos2kAlpha[0] + cosThetaI * sin2kAlpha[0];
                 cosThetaIp = cosThetaI * cos2kAlpha[0] - sinThetaI * sin2kAlpha[0];
-            } else if (p == 2) {
+            } else if (i == 2) {
                 sinThetaIp = sinThetaI * cos2kAlpha[2] + cosThetaI * sin2kAlpha[2];
                 cosThetaIp = cosThetaI * cos2kAlpha[2] - sinThetaI * sin2kAlpha[2];
             } else {
@@ -167,7 +179,7 @@ public:
 
             // Handle out-of-range $\cos \thetao$ from scale adjustment
             cosThetaIp = dr::abs(cosThetaIp);
-            _pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) * apPdf[p] * Np(dphi, p, s, gammaI, gammaT);
+            _pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[i]) * apPdf[i] * Np(dphi, i, s, gammaI, gammaT);
         }
 
         _pdf += Mp(cosThetaO, cosThetaI, sinThetaO, sinThetaI, v[pMax]) *
@@ -177,11 +189,16 @@ public:
         bs.pdf = _pdf;
         bs.eta = 1.;
         bs.sampled_type = +BSDFFlags::Glossy;
-        bs.sampled_component = 0;        
+        bs.sampled_component = 0;   
+
+        std::ofstream f1("me.txt");  
+        f1<<wo<<std::endl;
+        f1.close();
 
         UnpolarizedSpectrum value = dr::select(bs.pdf > 0, eval(ctx, si, bs.wo, active) / bs.pdf, 0);
-
+        
         return { bs, depolarizer<Spectrum>(value) & (active && bs.pdf > 0.f) };        
+        
     }
 
     Spectrum eval(const BSDFContext &ctx, const SurfaceInteraction3f &si,
@@ -534,7 +551,7 @@ private:
 
     static Point2f DemuxFloat(Float f){
         // CHECK(f >= 0 && f < 1);
-        UInt64 v = f * (1ull << 32);
+        UInt64 v = ((ScalarUInt64)4294967296) * f;
         // CHECK_LT(v, 0x100000000);
         UInt32 bits[2] = {Compact1By1(v), Compact1By1(v>>1)};
         return Point2f(bits[0]/Float(1 << 16), bits[1]/Float(1 << 16));
@@ -593,8 +610,8 @@ private:
 
         // Calculate Ap
         Spectrum ap[pMax + 1];
-        Float cosGammaO = dr::safe_sqrt(1 - h * h);
-        Float cosTheta = cosThetaI * cosGammaO;
+        Float cosGammaI = dr::safe_sqrt(1 - h * h);
+        Float cosTheta = cosThetaI * cosGammaI;
 
         // TODO: tuple.get<0>
         Float f = std::get<0>(fresnel(cosTheta, (Float)m_eta)); 
@@ -614,8 +631,6 @@ private:
         for(int i = 0; i<=pMax; i++){
             sumY = sumY + ap[i].y();
         }
-        
-        // = std::accumulate(ap.begin(), ap.end(), Float(0), [](Float s, const Spectrum &ap) { return s + ap.y(); });
 
         for (int i = 0; i <= pMax; ++i){
             apPdf[i] = ap[i].y() / sumY;
