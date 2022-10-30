@@ -36,10 +36,63 @@ def test02_eval_pdf(variant_scalar_rgb):
         assert dr.allclose(v_pdf, v_eval_pdf[1])
 
 
+def BSDFAdapterUV(bsdf_type, extra, u = 0.6, wi=[0, 0, 1], ctx=None):
+    sampler = mi.load_dict({'type': 'independent'})
+    """
+    Adapter to test BSDF sampling using the Chi^2 test.
+
+    Parameter ``bsdf_type`` (string):
+        Name of the BSDF plugin to instantiate.
+
+    Parameter ``extra`` (string):
+        Additional XML used to specify the BSDF's parameters.
+
+    Parameter ``wi`` (array(3,)):
+        Incoming direction, in local coordinates.
+    """
+
+    if ctx is None:
+        ctx = mi.BSDFContext()
+
+    def make_context(n):
+        si = dr.zeros(mi.SurfaceInteraction3f, n)
+        si.sh_frame = mi.Frame3f(si.n)
+        si.uv = [0, u]
+        si.wi = dr.normalize(mi.ScalarVector3f(0.8, 0.3, 0.05))
+        return (si, ctx)
+
+    def instantiate(args):
+        xml = """<bsdf version="3.0.0" type="%s">
+            %s
+        </bsdf>""" % (bsdf_type, extra)
+        return mi.load_string(xml % args)
+
+    def sample_functor(sample, *args):
+        n = dr.width(sample)
+        plugin = instantiate(args)
+        (si, ctx) = make_context(n)
+        bs, weight = plugin.sample(ctx, si, sample[0], [sample[1], sample[2]])
+
+        bs.wo = dr.normalize(mi.ScalarVector3f(-10, 10, -10))
+        w = dr.full(mi.Float, 1.0, dr.width(weight))
+        w[dr.all(dr.eq(weight, 0))] = 0
+        
+        return bs.wo, w
+
+    def pdf_functor(wo, *args):
+        n = dr.width(wo)
+        plugin = instantiate(args)
+        (si, ctx) = make_context(n)
+        return plugin.pdf(ctx, si, wo)
+
+    return sample_functor, pdf_functor
+
+
+
 def test03_chi2(variants_vec_backends_once_rgb):
     from mitsuba.chi2 import BSDFAdapter, ChiSquareTest, SphericalDomain
 
-    sample_func, pdf_func = BSDFAdapter("diffuse", '')
+    sample_func, pdf_func = BSDFAdapterUV("diffuse", '')
 
     chi2 = ChiSquareTest(
         domain=SphericalDomain(),
