@@ -14,46 +14,46 @@ def test01_create():
     print (params)
 
 
-# def test02_white_furnace(variant_scalar_rgb):
-#     sampler = mi.load_dict({'type': 'independent'})
+def test02_white_furnace(variant_scalar_rgb):
+    sampler = mi.load_dict({'type': 'independent'})
 
-#     si    = mi.SurfaceInteraction3f()
-#     si.p  = [0, 0, 0]
-#     si.n  = [0, 0, 1]
-#     si.wi = mi.warp.square_to_uniform_sphere(sampler.next_2d())
-#     si.sh_frame = mi.Frame3f(si.n)
+    si    = mi.SurfaceInteraction3f()
+    si.p  = [0, 0, 0]
+    si.n  = [0, 0, 1]
+    si.wi = mi.warp.square_to_uniform_sphere(sampler.next_2d())
+    si.sh_frame = mi.Frame3f(si.n)
     
-#     ctx = mi.BSDFContext()
+    ctx = mi.BSDFContext()
 
-#     beta_m = 0.1
-#     beta_n = 0.1
-#     total = 300000
-#     while(beta_m < 1):
-#         beta_n = 0.1
-#         while(beta_n < 1):
-#             # estimate reflected uniform incident radiance from hair
-#             count = total
-#             sum = 0.
-#             while(count > 0):
-#                 si.uv = [0, sampler.next_1d()]
-#                 sigma_a = 0.
-#                 bsdf = mi.load_dict({        
-#                     'type': 'hair',
-#                     'sigma_a': sigma_a,
-#                     'beta_m': beta_m,
-#                     'beta_n': beta_n,
-#                     'alpha': 0.,
-#                     'eta': 1.55
-#                 })
+    beta_m = 0.1
+    beta_n = 0.1
+    total = 300000
+    while(beta_m < 1):
+        beta_n = 0.1
+        while(beta_n < 1):
+            # estimate reflected uniform incident radiance from hair
+            count = total
+            sum = 0.
+            while(count > 0):
+                si.uv = [0, sampler.next_1d()]
+                sigma_a = 0.
+                bsdf = mi.load_dict({        
+                    'type': 'hair',
+                    'sigma_a': sigma_a,
+                    'beta_m': beta_m,
+                    'beta_n': beta_n,
+                    'alpha': 0.,
+                    'eta': 1.55
+                })
 
-#                 wo = mi.warp.square_to_uniform_sphere(sampler.next_2d())
-#                 sum += bsdf.eval(ctx, si, wo)
-#                 count -= 1
+                wo = mi.warp.square_to_uniform_sphere(sampler.next_2d())
+                sum += bsdf.eval(ctx, si, wo)
+                count -= 1
 
-#             avg = sum.y / (total * mi.warp.square_to_uniform_sphere_pdf(1.))
-#             assert dr.allclose(avg, 1, rtol = 0.05)
-#             beta_n += 0.2
-#         beta_m += 0.2
+            avg = sum.y / (total * mi.warp.square_to_uniform_sphere_pdf(1.))
+            assert dr.allclose(avg, 1, rtol = 0.05)
+            beta_n += 0.2
+        beta_m += 0.2
 
 
 # def test03_white_furnace_importance_sample(variant_scalar_rgb):
@@ -309,7 +309,7 @@ def test06_chi2():
                 sample_func=sample_func,
                 pdf_func=pdf_func,
                 sample_dim = 3,
-                res = 1,
+                res = 16,
                 ires = 4,
                 seed = 4,
                 # sample_count = 1000000

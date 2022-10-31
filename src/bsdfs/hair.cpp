@@ -186,7 +186,7 @@ public:
                 apPdf[pMax] * (1 / (2 * dr::Pi<ScalarFloat>));
 
         bs.wo = wo;
-        bs.pdf = _pdf;
+        bs.pdf = pdf(ctx, si, wo, active);
         bs.eta = 1.;
         bs.sampled_type = +BSDFFlags::Glossy;
         bs.sampled_component = 0;   
@@ -221,8 +221,8 @@ public:
         
 
         // Compute the BSDF
-        // Compute hair coordinate system terms related to _wo_
-        // Here the coordinate system is different from others!!
+        // Compute hair coordinate system terms related to _wi_
+        // Here the coordinate system is different from other shapes!!
         Float sinThetaO = wo.x();
         Float cosThetaO = dr::safe_sqrt(1 - dr::sqr(sinThetaO));
         Float phiO = dr::atan2(wo.z(), wo.y());
@@ -262,6 +262,7 @@ public:
 
         // Evaluate hair BSDF
         Float phi = phiO - phiI;
+
         Spectrum fsum(0.);
         for (int p = 0; p < pMax; ++p) {
             // Compute $\sin \thetao$ and $\cos \thetao$ terms accounting for scales
@@ -307,6 +308,7 @@ public:
         }
 
         Float h = -1 + 2 * si.uv[1];
+        
 
         Float sinThetaO = wo.x();
         Float cosThetaO = dr::safe_sqrt(1 - dr::sqr(sinThetaO));
@@ -317,6 +319,7 @@ public:
         Float cosThetaI = dr::safe_sqrt(1 - dr::sqr(sinThetaI));
         Float phiI = dr::atan2(si.wi.z(), si.wi.y());
         Float gammaI = dr::safe_asin(h);
+        
 
         // Compute $\gammat$ for refracted ray
         Float etap = dr::sqrt(m_eta * m_eta - dr::sqr(sinThetaI)) / cosThetaI;
@@ -475,11 +478,10 @@ private:
     Float s;
     Float sin2kAlpha[3], cos2kAlpha[3];
     ref<Texture> m_sigma_a; 
-    ref<Texture> m_reflectance;
     ScalarFloat m_beta_m, m_beta_n, m_alpha;
     ScalarFloat m_eta;
 
-    // Float enumlanin, pheomelanin; // color
+    ref<Texture> m_reflectance;
 
     // Helper function
     static Float I0(Float x) {
@@ -487,7 +489,6 @@ private:
         Float x2i = 1;
         int64_t ifact = 1;
         int i4 = 1;
-        // I0(x) \approx Sum_i x^(2i) / (4^i (i!)^2)
         for (int i = 0; i < 10; ++i) {
             if (i > 1) ifact *= i;
             val += x2i / (i4 * dr::sqr(ifact));
@@ -505,12 +506,12 @@ private:
         );
     }
 
-    static Float Mp(Float cosThetaI, Float cosThetaO, Float sinThetaI,
-                    Float sinThetaO, Float v) {
+    static Float Mp(Float cosThetaO, Float cosThetaI, Float sinThetaO,
+                    Float sinThetaI, Float v) {
         Float a = cosThetaI * cosThetaO / v;
         Float b = sinThetaI * sinThetaO / v;
         Float mp =
-            dr::select(v <= .1f, 
+            dr::select(v <= .01f, 
                 (dr::exp(LogI0(a) - b - 1 / v + 0.6931f + dr::log(1 / (2 * v)))),
                 (dr::exp(-b) * I0(a)) / (dr::sinh(1 / v) * 2 * v)
             );
@@ -571,23 +572,22 @@ private:
         return x;        
     }
 
-    static dr::Array<Spectrum, pMax + 1> Ap(Float cosThetaO, Float m_eta, Float h,
+    static dr::Array<Spectrum, pMax + 1> Ap(Float cosThetaI, Float eta, Float h,
                                             const Spectrum &T) {
-        dr::Array<Spectrum, pMax + 1> ap;
-        // Compute $p=0$ attenuation at initial cylinder intersection
-        Float cosGammaO = dr::safe_sqrt(1 - h * h);
-        Float cosTheta = cosThetaO * cosGammaO;
-        Float f = std::get<0>(fresnel(cosTheta, (Float)m_eta));
-        ap[0] = f;
 
+        dr::Array<Spectrum, pMax + 1> ap;
+        Float cosGammaI = dr::safe_sqrt(1 - h * h);
+        Float cosTheta = cosThetaI * cosGammaI;
+        Float f = std::get<0>(fresnel(cosTheta, eta)); 
+
+        ap[0] = f;
         // Compute $p=1$ attenuation term
         ap[1] = dr::sqr(1 - f) * T;
-
         // Compute attenuation terms up to $p=_pMax_$
         for (int p = 2; p < pMax; ++p) ap[p] = ap[p - 1] * T * f;
-
         // Compute attenuation term accounting for remaining orders of scattering
         ap[pMax] = ap[pMax - 1] * f * T / (Spectrum(1.f) - T * f);
+
         return ap;
     }
 
