@@ -1,0 +1,63 @@
+    def tabulate_pdf(self):
+        """
+        Numerically integrate the provided probability density function over
+        each cell to generate an array resembling the histogram computed by
+        ``tabulate_histogram()``. The function uses the trapezoid rule over
+        intervals discretized into ``self.ires`` separate function evaluations.
+        """
+
+        self.histogram_start = time.time()
+
+        # Determine total number of samples and construct an initial index
+        sample_count    = self.ires**2
+        cell_count      = self.res.x * self.res.y
+        index           = dr.arange(mi.UInt32, cell_count * sample_count)
+        extents         = self.bounds.extents()
+        cell_size       = extents / self.res
+        sample_spacing  = cell_size / (self.ires - 1)
+
+        # Determine cell and integration sample indices
+        cell_index      = index // sample_count
+        sample_index    = index - cell_index * sample_count
+        cell_y          = cell_index // self.res.x
+        cell_x          = cell_index - cell_y * self.res.x
+        sample_y        = sample_index // self.ires
+        sample_x        = sample_index - sample_y * self.ires
+        cell_index_2d   = mi.Vector2u(cell_x, cell_y)
+        sample_index_2d = mi.Vector2u(sample_x, sample_y)
+
+        # Compute the position of each sample
+        p = self.bounds.min + cell_index_2d * cell_size
+        p += (sample_index_2d + 1e-4) * (1-2e-4) * sample_spacing
+
+        # Trapezoid rule integration weights
+        weights = dr.prod(dr.select(dr.eq(sample_index_2d, 0) |
+                                     dr.eq(sample_index_2d, self.ires - 1), 0.5, 1))
+        weights *= dr.prod(sample_spacing) * self.sample_count
+
+        # Remap onto the target domain
+        p = self.domain.map_forward(p)
+
+        # Evaluate the model density
+        pdf = self.another_pdf_func(p)
+
+        # Sum over each cell
+        self.another_pdf = dr.block_sum(pdf * weights, sample_count)
+
+        if len(self.another_pdf) == 1:
+            dr.resize(self.another_pdf, dr.width(p))
+
+        # A few sanity checks
+        pdf_min = dr.min(self.another_pdf) / self.sample_count
+        if not pdf_min[0] >= 0:
+            self._log('Failure: Encountered a cell with a '
+                      'negative PDF value: %f' % pdf_min)
+            self.fail = True
+
+        self.another_pdf_sum = dr.sum(self.another_pdf) / self.sample_count
+        if self.another_pdf_sum[0] > 1.1:
+            self._log('Failure: PDF integrates to a value greater '
+                      'than 1.0: %f' % self.another_pdf_sum[0])
+            self.fail = True
+
+        self.histogram_end = time.time()
