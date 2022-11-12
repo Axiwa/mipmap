@@ -1,6 +1,11 @@
 import mitsuba as mi
 import drjit as dr
 import time
+import numpy as np
+import gc
+from memory_profiler import profile
+
+from scipy import integrate
 
 class ChiSquareTest:
     """
@@ -108,7 +113,7 @@ class ChiSquareTest:
         considered to be weighted.
         """
 
-        self.pdf_start = time.time()
+        self.histogram_start = time.time()
 
         # Generate a table of uniform variates
         idx = dr.arange(mi.UInt64, self.sample_count)
@@ -173,7 +178,7 @@ class ChiSquareTest:
                       'than 1.0: %f' % self.histogram_sum[0])
             self.fail = True
 
-        self.pdf_end = time.time()
+        self.histogram_end = time.time()
 
     def tabulate_pdf(self):
         """
@@ -183,7 +188,7 @@ class ChiSquareTest:
         intervals discretized into ``self.ires`` separate function evaluations.
         """
 
-        self.histogram_start = time.time()
+        self.pdf_start = time.time()
 
         # Determine total number of samples and construct an initial index
         sample_count    = self.ires**2
@@ -237,74 +242,129 @@ class ChiSquareTest:
                       'than 1.0: %f' % self.pdf_sum[0])
             self.fail = True
 
-        self.histogram_end = time.time()
+        self.pdf_end = time.time()
 
-
+    # @profile
     def tabulate_another_pdf(self):
-        """
-        Numerically integrate the provided probability density function over
-        each cell to generate an array resembling the histogram computed by
-        ``tabulate_histogram()``. The function uses the trapezoid rule over
-        intervals discretized into ``self.ires`` separate function evaluations.
-        """
+        # *************************  modified integration method: higher ires ***********************#
+        # ires = 8
+        # res = self.res
 
-        ires = 4
-        res = self.res
-        # if self.domain.aspect() is None:
-        #     self.res = mi.ScalarVector2u(res, 1)
-        # else:
-        #     self.res = dr.maximum(mi.ScalarVector2u(
-        #         int(res / self.domain.aspect()), res), 1)
+        # self.pdf_start = time.time()
+
+        # # Determine total number of samples and construct an initial index
+        # sample_count    = ires**2
+        # cell_count      = self.res.x * self.res.y
+        # index           = dr.arange(mi.UInt32, cell_count * sample_count)
+        # extents         = self.bounds.extents()
+        # cell_size       = extents / self.res
+        # sample_spacing  = cell_size / (ires - 1)
+
+        # # Determine cell and integration sample indices
+        # cell_index      = index // sample_count
+        # sample_index    = index - cell_index * sample_count
+        # cell_y          = cell_index // self.res.x
+        # cell_x          = cell_index - cell_y * self.res.x
+        # sample_y        = sample_index // ires
+        # sample_x        = sample_index - sample_y * ires
+        # cell_index_2d   = mi.Vector2u(cell_x, cell_y)
+        # sample_index_2d = mi.Vector2u(sample_x, sample_y)
+
+        # # Compute the position of each sample
+        # p = self.bounds.min + cell_index_2d * cell_size
+        # p += (sample_index_2d + 1e-4) * (1-2e-4) * sample_spacing
+
+        # # Trapezoid rule integration weights
+        # weights = dr.prod(dr.select(dr.eq(sample_index_2d, 0) |
+        #                              dr.eq(sample_index_2d, ires - 1), 0.5, 1))
+        # weights *= dr.prod(sample_spacing) * self.sample_count
+
+        # # Remap onto the target domain
+        # p = self.domain.map_forward(p)
+
+        # # Evaluate the model density
+        # pdf = self.pdf_func(p)
+
+        # # Sum over each cell
+        # self.another_pdf = dr.block_sum(pdf * weights, sample_count)
+
+        # if len(self.another_pdf) == 1:
+        #     dr.resize(self.another_pdf, dr.width(p))
+
+        # # A few sanity checks
+        # pdf_min = dr.min(self.another_pdf) / self.sample_count
+        # if not pdf_min[0] >= 0:
+        #     self._log('Failure: Encountered a cell with a '
+        #               'negative PDF value: %f' % pdf_min)
+        #     self.fail = True
+
+        # self.another_pdf_sum = dr.sum(self.another_pdf) / self.sample_count
+        # if self.another_pdf_sum[0] > 1.1:
+        #     self._log('Failure: PDF integrates to a value greater '
+        #               'than 1.0: %f' % self.another_pdf_sum[0])
+        #     self.fail = True
+
+        # self.pdf_end = time.time()
+
+
+        # *************************  modified integration method: adaptive ode solver ***********************#
 
         self.pdf_start = time.time()
 
         # Determine total number of samples and construct an initial index
-        sample_count    = ires**2
         cell_count      = self.res.x * self.res.y
-        index           = dr.arange(mi.UInt32, cell_count * sample_count)
         extents         = self.bounds.extents()
         cell_size       = extents / self.res
-        sample_spacing  = cell_size / (ires - 1)
-
+        
         # Determine cell and integration sample indices
-        cell_index      = index // sample_count
-        sample_index    = index - cell_index * sample_count
+        cell_index      = dr.arange(mi.UInt32, cell_count)
         cell_y          = cell_index // self.res.x
         cell_x          = cell_index - cell_y * self.res.x
-        sample_y        = sample_index // ires
-        sample_x        = sample_index - sample_y * ires
         cell_index_2d   = mi.Vector2u(cell_x, cell_y)
-        sample_index_2d = mi.Vector2u(sample_x, sample_y)
 
-        # Compute the position of each sample
-        p = self.bounds.min + cell_index_2d * cell_size
-        p += (sample_index_2d + 1e-4) * (1-2e-4) * sample_spacing
+        # p and pmax is the region for integration
+        pmin = self.bounds.min + cell_index_2d * cell_size
+        pmax = pmin + cell_size
 
-        # Trapezoid rule integration weights
-        weights = dr.prod(dr.select(dr.eq(sample_index_2d, 0) |
-                                     dr.eq(sample_index_2d, ires - 1), 0.5, 1))
-        weights *= dr.prod(sample_spacing) * self.sample_count
+        # conversion from dr.array to scipy 
+        pmin_num = pmin.numpy()
+        pmax_num = pmax.numpy()
 
-        # Remap onto the target domain
-        p = self.domain.map_forward(p)
+        ans = np.zeros(pmin_num.shape[0])
+        # tmp = np.loadtxt("ans.txt")
+        # ans[:120] = tmp
 
-        # Evaluate the model density
-        pdf = self.pdf_func(p)
+        print (ans.shape)
+
+        # define the function for integration
+        # sample_count is multiplied here to avoid truncation error
+        def myfunc(y, x):
+            wo = self.domain.map_forward(mi.Point2f(x, y))
+            p = self.pdf_func(wo).numpy() * self.sample_count
+            return p[0]
+
+        for i in range(0, pmin_num.shape[0]):
+            ans[i], err  = integrate.dblquad(myfunc, pmin_num[i][0], pmax_num[i][0], lambda x: pmin_num[i][1], lambda y: pmax_num[i][1], epsabs = 1) # epsabs = 1e-6, epsrel = 1e-6 
+            gc.collect()
+            with open("ans.txt", "a") as f:
+                f.write("{}\n".format(ans[i]))
+            # print (ans[i])
+            # input()
 
         # Sum over each cell
-        self.another_pdf = dr.block_sum(pdf * weights, sample_count)
+        self.another_pdf = mi.Float(ans)
 
         if len(self.another_pdf) == 1:
-            dr.resize(self.another_pdf, dr.width(p))
+            dr.resize(self.another_pdf, dr.width(pmin_num.shape[0]))
 
         # A few sanity checks
-        pdf_min = dr.min(self.another_pdf) / self.sample_count
+        pdf_min = dr.min(self.another_pdf)
         if not pdf_min[0] >= 0:
             self._log('Failure: Encountered a cell with a '
                       'negative PDF value: %f' % pdf_min)
             self.fail = True
 
-        self.another_pdf_sum = dr.sum(self.another_pdf) / self.sample_count
+        self.another_pdf_sum = dr.sum(mi.Float(ans) / self.sample_count)
         if self.another_pdf_sum[0] > 1.1:
             self._log('Failure: PDF integrates to a value greater '
                       'than 1.0: %f' % self.another_pdf_sum[0])
@@ -355,11 +415,11 @@ class ChiSquareTest:
         # Compute chi^2 statistic and pool low-valued cells
         print ("Histogram vs. pdf")
         chi2val, dof, pooled_in, pooled_out = mi.math.chi2(histogram, pdf, 5)
-        result = self.show(chi2val, dof, pooled_in, pooled_out, self.histogram, self.pdf, "hist", "pdf", test_count)
+        self.show(chi2val, dof, pooled_in, pooled_out, self.histogram, self.pdf, "hist", "pdf", test_count)
 
         print ("Histogram vs. High ires pdf")
         chi2val, dof, pooled_in, pooled_out = mi.math.chi2(histogram, another_pdf, 5)
-        self.show(chi2val, dof, pooled_in, pooled_out, self.histogram, self.another_pdf, "hist", "high_ires", test_count)
+        result = self.show(chi2val, dof, pooled_in, pooled_out, self.histogram, self.another_pdf, "hist", "high_ires", test_count)
 
         print ("High ires pdf vs. pdf")
         chi2val, dof, pooled_in, pooled_out = mi.math.chi2(another_pdf, pdf, 5)
@@ -407,9 +467,9 @@ class ChiSquareTest:
 
         print(self.messages)
         self.messages = ""
-        if not result:
+        # if not result:
             # self._dump_tables()
-            self._dump_pdf(first, second, name1, name2)
+        self._dump_pdf(first, second, name1, name2)
         return result
 
 
@@ -467,7 +527,7 @@ class ChiSquareTest:
             f.write('    fig, axs = plt.subplots(1,3, figsize=(15, 5))\n')
             f.write('    pdf = np.array(pdf)\n')
             f.write('    histogram = np.array(histogram)\n')
-            f.write('    diff=histogram - pdf\n')
+            f.write('    diff=pdf-histogram\n')
             f.write('    absdiff=np.abs(diff).max()\n')
             f.write('    a = pdf.shape[1] / pdf.shape[0]\n')
             f.write('    pdf_plot = axs[0].imshow(pdf, vmin=0, aspect=a,'
@@ -492,7 +552,7 @@ class ChiSquareTest:
 
 
 class SphericalDomain:
-    'Maps between the unit sphere and a [cos(theta), phi] parameterization.'
+    'Maps between the unit sphere and a [sin(theta), phi] parameterization.'
 
     def bounds(self):
         return mi.ScalarBoundingBox2f([-dr.pi, -1], [dr.pi, 1])
@@ -501,18 +561,18 @@ class SphericalDomain:
         return 2
 
     def map_forward(self, p):
-        cos_theta = -p.y
-        sin_theta = dr.safe_sqrt(dr.fma(-cos_theta, cos_theta, 1))
+        sin_theta = p.y
+        cos_theta = dr.safe_sqrt(dr.fma(-sin_theta, sin_theta, 1))
         sin_phi, cos_phi = dr.sincos(p.x)
 
         return mi.Vector3f(
-            cos_phi * sin_theta,
-            sin_phi * sin_theta,
-            cos_theta
+            sin_theta,
+            cos_theta * cos_phi,
+            cos_theta * sin_phi,
         )
 
     def map_backward(self, p):
-        return mi.Vector2f(dr.atan2(p.y, p.x), -p.z)
+        return mi.Vector2f(dr.atan2(p.z, p.y), p.x)
 
 
 # --------------------------------------

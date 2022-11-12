@@ -269,7 +269,6 @@ public:
                 cosThetaIp =
                     cosThetaI * cos2kAlpha[1] + sinThetaI * sin2kAlpha[1];
             }
-
             // Handle remainder of $p$ values for hair scale tilt
             else if (p == 1) {
                 sinThetaIp =
@@ -478,8 +477,8 @@ private:
     ScalarFloat m_beta_m, m_beta_n, m_alpha;
     ScalarFloat m_eta;
 
-// Helper function
-    static inline Float I0(Float x) {
+    // Helper function
+    inline Float I0(Float x) const {
         Float val     = 0;
         Float x2i     = 1;
         int64_t ifact = 1;
@@ -495,15 +494,15 @@ private:
         return val;
     }
 
-    static Float LogI0(Float x) {
+    Float LogI0(Float x) const {
         return dr::select(x > 12,
                           x + 0.5f * (-dr::log(2 * dr::Pi<ScalarFloat>) +
                                       dr::log(1 / x) + 1 / (8 * x)),
                           dr::log(I0(x)));
     }
 
-    static Float Mp(Float cosThetaO, Float cosThetaI, Float sinThetaO,
-                    Float sinThetaI, Float v) {
+    Float Mp(Float cosThetaO, Float cosThetaI, Float sinThetaO,
+                    Float sinThetaI, Float v) const {
         Float a  = cosThetaI * cosThetaO / v;
         Float b  = sinThetaI * sinThetaO / v;
         Float mp = dr::select(
@@ -513,30 +512,30 @@ private:
         return mp;
     }
 
-    static inline Float Logistic(Float x, Float s) {
+    inline Float Logistic(Float x, Float s) const {
         x = dr::abs(x);
         return dr::exp(-x / s) / (s * dr::sqr(1 + dr::exp(-x / s)));
     }
 
-    static inline Float LogisticCDF(Float x, Float s) {
+    inline Float LogisticCDF(Float x, Float s) const {
         return 1 / (1 + dr::exp(-x / s));
     }
 
-    static inline Float TrimmedLogistic(Float x, Float s, Float a, Float b) {
+    inline Float TrimmedLogistic(Float x, Float s, Float a, Float b) const {
         // a should be smaller than b
         return Logistic(x, s) / (LogisticCDF(b, s) - LogisticCDF(a, s));
     }
 
-    static inline Float angleMap(Float dphi){
+    inline Float angleMap(Float dphi) const{
         // map angle to [-pi, pi]
         Float pi    = dr::Pi<Float>;
         Float angle = dr::fmod(dphi, 2 * pi);
-        angle       = dr::select(angle < -pi, angle + 2 * pi, angle);
-        angle       = dr::select(angle > pi, angle - 2 * pi, angle);
+        dr::masked(angle, angle < -pi) = angle + 2 * pi;
+        dr::masked(angle, angle > pi) = angle - 2 * pi;
         return angle;
     }
 
-    static Float Np(Float phi, int p, Float s, Float gammaI, Float gammaT) {
+    Float Np(Float phi, int p, Float s, Float gammaI, Float gammaT) const {
         Float Phi  = 2 * p * gammaT - 2 * gammaI + p * dr::Pi<ScalarFloat>;
         Float dphi = phi - Phi;
 
@@ -546,8 +545,8 @@ private:
     }
 
 
-    static dr::Array<Spectrum, pMax + 1> Ap(Float cosThetaI, Float eta, Float h,
-                                            const Spectrum &T) {
+    dr::Array<Spectrum, pMax + 1> Ap(Float cosThetaI, Float eta, Float h,
+                                            const Spectrum &T) const {
         dr::Array<Spectrum, pMax + 1> ap;
         
         // Compute $p=0$ attenuation at initial cylinder intersection
@@ -624,7 +623,7 @@ private:
         return apPdf;
     }
 
-    static Float SampleTrimmedLogistic(Float u, Float s, Float a, Float b) {
+    Float SampleTrimmedLogistic(Float u, Float s, Float a, Float b) const {
         // a should be smaller than b
         Float k = LogisticCDF(b, s) - LogisticCDF(a, s);
         Float x = -s * dr::log(1 / (u * k + LogisticCDF(a, s)) - 1);

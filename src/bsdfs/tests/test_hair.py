@@ -97,8 +97,7 @@ import gc
 
 
 # def test04_sample_numeric(variants_vec_backends_once_rgb):
-#     mi.set_variant('llvm_ad_rgb')
-#     total = 10000
+#     total = 50000
 #     sampler = mi.load_dict({'type': 'independent', 'sample_count': total})
 #     sampler.seed(seed = 0, wavefront_size = total)
 
@@ -115,8 +114,8 @@ import gc
 #     while(beta_m < 1):
 #         beta_n = 0.1
 #         while(beta_n < 1):
+#             count = total
 #             # estimate reflected uniform incident radiance from hair
-            
 #             sigma_a = 0.
 #             si.uv = [0, sampler.next_1d()] 
 #             bsdf = mi.load_dict({        
@@ -124,13 +123,18 @@ import gc
 #                 'sigma_a': sigma_a,
 #                 'beta_m': beta_m,
 #                 'beta_n': beta_n,
-#                 'alpha': 0.,
+#                 'alpha': 2.,
 #                 'eta': 1.55,
 #             })
 #             si.wi = mi.warp.square_to_uniform_sphere(sampler.next_2d())
-#             bs, spec = bsdf.sample(ctx, si, sampler.next_1d(), sampler.next_2d())
-#             dr.eval(bs, spec)
-#             assert dr.allclose(spec.y, 1, rtol = 0.001)
+
+#             d1 = sampler.next_1d()
+#             d2 = sampler.next_2d()
+
+#             bs, spec = bsdf.sample(ctx, si, d1, d2)
+#             # dr.eval(bs, spec)
+#             flag = dr.allclose(spec.y, 1, atol = 0.001)
+#             assert (dr.all(flag))
 
 #             beta_n += 0.2
 #         beta_m += 0.2
@@ -138,8 +142,7 @@ import gc
 
 
 # def test04_sample_pdf(variants_vec_backends_once_rgb):
-#     mi.set_variant('llvm_ad_rgb')
-#     total = 30000
+#     total = 300000
 #     sampler = mi.load_dict({'type': 'independent', 'sample_count': total})
 #     sampler.seed(seed = 2, wavefront_size = total)
 
@@ -164,7 +167,7 @@ import gc
 #                 'sigma_a': sigma_a,
 #                 'beta_m': beta_m,
 #                 'beta_n': beta_n,
-#                 'alpha': 2.,
+#                 'alpha': 0.,
 #                 'eta': 1.55,
 #                 })
 #             si.wi = mi.warp.square_to_uniform_sphere(sampler.next_2d())
@@ -182,8 +185,7 @@ import gc
 #             beta_n += 0.2
 #         beta_m += 0.2
 
-# def test05_sampleConsistency():
-#     mi.set_variant('llvm_ad_rgb')
+# def test05_sampleConsistency(variants_vec_backends_once_rgb):
 #     def helper_Li(spec):
 #         return spec.z * spec.z
 
@@ -247,13 +249,12 @@ def test06_chi2():
     eta = 1.55
     total = 10
 
-    beta_m = 0.4
+    beta_m = 0.2
     beta_n = 0.2
     sample_count = 1000000
-    res = 21
-    ires = 1230
-    # TODO Adaptive!
-
+    res = 20 # 101 is OK for most
+    ires = 16 # 16 is OK for most
+    # TODO Adaptive pdf integration
 
     phi = 0
     theta = 0
@@ -261,18 +262,17 @@ def test06_chi2():
     while(beta_m <= 1):
         beta_n = 0.2
         while(beta_n <= 1):
-            for count_theta in range(1, total):
-                for count_phi in range(0, total+1):
-                    for count_u in range(total, total+1):
+            for count_theta in range(-total // 2 + 1, total // 2): # from -pi/2 to pi/2
+                for count_phi in range(0, 1):
 
                         theta = count_theta / total * dr.pi
                         phi =  count_phi / total * 2 * dr.pi
                         u = 0.5
 
-                        # beta_m = 0.2
-                        # beta_n = 0.2
-                        # theta = 1 / total * dr.pi
-                        # phi = 5 / total * dr.pi
+                        beta_m = 0.4
+                        beta_n = 0.8
+                        theta = 2 / total * dr.pi
+                        phi = 2 / total * 2 * dr.pi
 
                         xml = f"""<float name="alpha" value="{alpha}" />
                                 <rgb name="sigma_a" value="{sigma_a}"/>
@@ -281,13 +281,9 @@ def test06_chi2():
                                 <float name="eta" value="{eta}" />
                             """
                         
-
-                        # 2 0
-
-                        x = dr.sin(theta) * dr.cos(phi)
-                        y = dr.sin(theta) * dr.sin(phi)
-                        z = dr.cos(theta)
-
+                        x = dr.sin(theta)
+                        y = dr.cos(theta) * dr.cos(phi)
+                        z = dr.cos(theta) * dr.sin(phi)
 
                         wi = dr.normalize(mi.ScalarVector3f(x, y, z))
                     
@@ -303,13 +299,19 @@ def test06_chi2():
                             ires = ires,
                             sample_count = sample_count
                         )
-                        print (count_theta)
-                        print (count_phi)
-                        print (wi)
-                        print (beta_m)
-                        print (beta_n)
-                        assert chi2.run()
-                        # input()
+
+                        print ("beta_m: ", beta_m)
+                        print ("beta_n: ", beta_n)
+                        print ("count_theta: ", count_theta)
+                        print ("count_phi: ", count_phi)
+                        print ("wi: ", wi)
+
+                        flag = chi2.run()
+                        if (flag == False and count_phi == 0):
+                            with open("failed.txt", "a") as f:
+                                f.write("beta_m: {}, beta_n: {}, count_theta: {}\n".format(beta_m, beta_n, count_theta, count_phi))
+                        
+                        input()
             beta_n += 0.2
             gc.collect()
         beta_m += 0.2
@@ -353,3 +355,5 @@ def BSDFAdapterUV(bsdf_type, extra, u = 0.5, wi=[0, 0, 1], ctx=None):
         return plugin.pdf(ctx, si, wo)
 
     return sample_functor, pdf_functor
+
+
