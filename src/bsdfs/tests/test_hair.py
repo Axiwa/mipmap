@@ -311,7 +311,7 @@ def test06_chi2():
                             with open("failed.txt", "a") as f:
                                 f.write("beta_m: {}, beta_n: {}, count_theta: {}\n".format(beta_m, beta_n, count_theta, count_phi))
                         
-                        input()
+                        # input()
             beta_n += 0.2
             gc.collect()
         beta_m += 0.2
