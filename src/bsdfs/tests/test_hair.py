@@ -252,7 +252,7 @@ def test06_chi2():
     beta_m = 0.2
     beta_n = 0.2
     sample_count = 1000000
-    res = 20 # 101 is OK for most
+    res = 101 # 101 is OK for most
     ires = 16 # 16 is OK for most
     # TODO Adaptive pdf integration
 
@@ -269,10 +269,10 @@ def test06_chi2():
                         phi =  count_phi / total * 2 * dr.pi
                         u = 0.5
 
-                        beta_m = 0.4
-                        beta_n = 0.8
-                        theta = 2 / total * dr.pi
-                        phi = 2 / total * 2 * dr.pi
+                        # beta_m = 0.4
+                        # beta_n = 0.8
+                        # theta = 2 / total * dr.pi
+                        # phi = 2 / total * 2 * dr.pi
 
                         xml = f"""<float name="alpha" value="{alpha}" />
                                 <rgb name="sigma_a" value="{sigma_a}"/>
