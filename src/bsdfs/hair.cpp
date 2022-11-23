@@ -544,6 +544,12 @@ private:
         return TrimmedLogistic(dphi, s, -dr::Pi<Float>, dr::Pi<Float>);
     }
 
+    Float SampleTrimmedLogistic(Float u, Float s, Float a, Float b) const {
+        // a should be smaller than b
+        Float k = LogisticCDF(b, s) - LogisticCDF(a, s);
+        Float x = -s * dr::log(1 / (u * k + LogisticCDF(a, s)) - 1);
+        return dr::clamp(x, a, b);
+    }
 
     dr::Array<Spectrum, pMax + 1> Ap(Float cosThetaI, Float eta, Float h,
                                             const Spectrum &T) const {
@@ -621,13 +627,6 @@ private:
             apPdf[i] = ap[i].y() / sumY;
         }
         return apPdf;
-    }
-
-    Float SampleTrimmedLogistic(Float u, Float s, Float a, Float b) const {
-        // a should be smaller than b
-        Float k = LogisticCDF(b, s) - LogisticCDF(a, s);
-        Float x = -s * dr::log(1 / (u * k + LogisticCDF(a, s)) - 1);
-        return dr::clamp(x, a, b);
     }
 
 };

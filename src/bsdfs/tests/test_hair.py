@@ -242,7 +242,7 @@ def test06_chi2():
     sys.path.insert(1, '.')
     from .adap_chi2 import ChiSquareTest, SphericalDomain
 
-    mi.set_variant('llvm_ad_rgb')
+    mi.set_variant('llvm_rgb_double')
 
     sigma_a = 0
     alpha = 0
@@ -251,9 +251,9 @@ def test06_chi2():
 
     beta_m = 0.2
     beta_n = 0.2
-    sample_count = 1000000
-    res = 101 # 101 is OK for most
-    ires = 16 # 16 is OK for most
+    sample_count = 100000000
+    res = 201 # 101 is OK for most
+    ires = 32 # 16 is OK for most
     # TODO Adaptive pdf integration
 
     phi = 0
@@ -263,14 +263,14 @@ def test06_chi2():
         beta_n = 0.2
         while(beta_n <= 1):
             for count_theta in range(-total // 2 + 1, total // 2): # from -pi/2 to pi/2
-                for count_phi in range(0, 1):
+                for count_phi in range(0, total+1):
 
                         theta = count_theta / total * dr.pi
                         phi =  count_phi / total * 2 * dr.pi
                         u = 0.5
 
-                        # beta_m = 0.4
-                        # beta_n = 0.8
+                        # beta_m = 1
+                        # beta_n = 0.6
                         # theta = 2 / total * dr.pi
                         # phi = 2 / total * 2 * dr.pi
 
@@ -289,8 +289,8 @@ def test06_chi2():
                     
                         sample_func, pdf_func = BSDFAdapterUV("hair", xml, u=u, wi=wi)
 
-                        # chi2 = mi.chi2.ChiSquareTest(
-                        chi2 = ChiSquareTest(
+                        chi2 = mi.chi2.ChiSquareTest(
+                        # chi2 = ChiSquareTest(
                             domain=SphericalDomain(),
                             sample_func=sample_func,
                             pdf_func=pdf_func,
@@ -307,9 +307,9 @@ def test06_chi2():
                         print ("wi: ", wi)
 
                         flag = chi2.run()
-                        if (flag == False and count_phi == 0):
+                        if (flag == False):
                             with open("failed.txt", "a") as f:
-                                f.write("beta_m: {}, beta_n: {}, count_theta: {}\n".format(beta_m, beta_n, count_theta, count_phi))
+                                f.write("beta_m: {}, beta_n: {}, count_theta: {}, count_phi: {}\n".format(beta_m, beta_n, count_theta, count_phi))
                         
                         # input()
             beta_n += 0.2

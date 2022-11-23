@@ -331,8 +331,8 @@ class ChiSquareTest:
         pmax_num = pmax.numpy()
 
         ans = np.zeros(pmin_num.shape[0])
-        # tmp = np.loadtxt("ans.txt")
-        # ans[:120] = tmp
+        tmp = np.loadtxt("ans.txt")
+        ans[:1193] = tmp
 
         print (ans.shape)
 
@@ -343,7 +343,7 @@ class ChiSquareTest:
             p = self.pdf_func(wo).numpy() * self.sample_count
             return p[0]
 
-        for i in range(0, pmin_num.shape[0]):
+        for i in range(1193, pmin_num.shape[0]):
             ans[i], err  = integrate.dblquad(myfunc, pmin_num[i][0], pmax_num[i][0], lambda x: pmin_num[i][1], lambda y: pmax_num[i][1], epsabs = 1) # epsabs = 1e-6, epsrel = 1e-6 
             gc.collect()
             with open("ans.txt", "a") as f:
