@@ -104,6 +104,16 @@ public:
         }
         p++;
 
+        /******* for different lobe  ********/
+        // p = 3;
+        // apPdf[0] = 0;
+        // apPdf[1] = 0;
+        // apPdf[2] = 0;
+        // apPdf[3] = 1;
+        /******* for different lobe  ********/
+
+        // std::cout<<apPdf[0]<<" "<<apPdf[1]<<" "<<apPdf[2]<<" "<<apPdf[3]<<std::endl;
+
         // std::cout<<sample1<<std::endl;
         // std::cout<<u[0][1]<<std::endl;
 
@@ -131,7 +141,6 @@ public:
         // }
 
         // Sample $M_p$ to compute $\thetai$
-        u[1][0] = dr::maximum(u[1][0], Float(1e-5));
 
         Float cosTheta =
             1 + v[pMax] * dr::log(u[1][0] + (1 - u[1][0]) * dr::exp(-2 / v[pMax]));
@@ -154,7 +163,15 @@ public:
         Float dphi;
         Float Phi = 2 * p * gammaT - 2 * gammaI + p * dr::Pi<ScalarFloat>;
 
-        dphi = dr::select(p < pMax, Phi + SampleTrimmedLogistic(u[0][1], s, -dr::Pi<ScalarFloat>, dr::Pi<ScalarFloat>), 2 * dr::Pi<ScalarFloat> * u[0][1]);
+
+        /******* for different dimension  ********/
+
+        dphi = 2 * dr::Pi<ScalarFloat> * u[0][1];
+
+        // dphi = dr::select(p < pMax, Phi + SampleTrimmedLogistic(u[0][1], s, -dr::Pi<ScalarFloat>, dr::Pi<ScalarFloat>), 2 * dr::Pi<ScalarFloat> * u[0][1]);
+
+        /******* for different dimension  ********/
+
 
         // Compute _wi_ from sampled hair scattering angles
         Float phiO = phiI + dphi;
@@ -203,7 +220,7 @@ public:
         bs.sampled_type      = +BSDFFlags::Glossy;
         bs.sampled_component = 0;
 
-        // std::cout<<bs.wo<<std::endl;
+        // std::cout<<bs.pdf<<std::endl;
 
         UnpolarizedSpectrum value =
             dr::select(dr::neq(bs.pdf, 0), eval(ctx, si, bs.wo, active) / bs.pdf, 0);
@@ -330,6 +347,15 @@ public:
         // Compute PDF for $A_p$ terms
         dr::Array<Float, pMax + 1> apPdf = ComputeApPdf(cosThetaI, si, active);
 
+        /******* for different lobe  ********/
+        // apPdf[0] = 0;
+        // apPdf[1] = 0;
+        // apPdf[2] = 0;
+        // apPdf[3] = 1;
+        /******* for different lobe  ********/
+
+        // std::cout<<apPdf[0]<<" "<<apPdf[1]<<" "<<apPdf[2]<<" "<<apPdf[3]<<std::endl;
+
         // Compute PDF sum for hair scattering events
         Float phi  = phiO - phiI;
         Float _pdf = Float(0);
@@ -353,10 +379,17 @@ public:
                 cosThetaIp = cosThetaI;
             }
 
-            // Handle out-of-range $\cos \thetao$ from scale adjustment
             cosThetaIp = dr::abs(cosThetaIp);
-            _pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) *
-                    apPdf[p] * Np(phi, p, s, gammaI, gammaT);
+
+            /******* for different dimension  ********/
+
+            // uniform Np
+            _pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) * apPdf[p] * (1 / (2 * dr::Pi<ScalarFloat>)); 
+
+            // importance sampling
+            // _pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) * apPdf[p] * Np(phi, p, s, gammaI, gammaT);
+
+            /******* for different dimension  ********/
         }
         _pdf += Mp(cosThetaO, cosThetaI, sinThetaO, sinThetaI, v[pMax]) *
                 apPdf[pMax] * (1 / (2 * dr::Pi<ScalarFloat>) );

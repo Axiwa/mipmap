@@ -251,9 +251,9 @@ def test06_chi2():
 
     beta_m = 0.2
     beta_n = 0.2
-    sample_count = 100000000
+    sample_count = 1000000
     res = 201 # 101 is OK for most
-    ires = 32 # 16 is OK for most
+    ires = 16 # 16 is OK for most
     # TODO Adaptive pdf integration
 
     phi = 0
@@ -262,7 +262,7 @@ def test06_chi2():
     while(beta_m <= 1):
         beta_n = 0.2
         while(beta_n <= 1):
-            for count_theta in range(-total // 2 + 1, total // 2): # from -pi/2 to pi/2
+            for count_theta in range(-total // 2 + 1, total // 2): # -total // 2 + 1, total // 2
                 for count_phi in range(0, total+1):
 
                         theta = count_theta / total * dr.pi
@@ -297,6 +297,7 @@ def test06_chi2():
                             sample_dim = 3,
                             res = res,
                             ires = ires,
+                            seed = 1,
                             sample_count = sample_count
                         )
 

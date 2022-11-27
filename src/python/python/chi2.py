@@ -324,8 +324,7 @@ class ChiSquareTest:
             result = True
         if not quiet:
             print(self.messages)
-            if not result:
-                self._dump_tables()
+            self._dump_tables()
         return result
 
     def _dump_tables(self):
