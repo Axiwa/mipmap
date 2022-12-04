@@ -105,11 +105,11 @@ public:
         p++;
 
         /******* for different lobe  ********/
-        // p = 3;
-        // apPdf[0] = 0;
+        // p = 0;
+        // apPdf[0] = 1;
         // apPdf[1] = 0;
         // apPdf[2] = 0;
-        // apPdf[3] = 1;
+        // apPdf[3] = 0;
         /******* for different lobe  ********/
 
         // std::cout<<apPdf[0]<<" "<<apPdf[1]<<" "<<apPdf[2]<<" "<<apPdf[3]<<std::endl;
@@ -166,9 +166,9 @@ public:
 
         /******* for different dimension  ********/
 
-        dphi = 2 * dr::Pi<ScalarFloat> * u[0][1];
+        // dphi = 2 * dr::Pi<ScalarFloat> * u[0][1];
 
-        // dphi = dr::select(p < pMax, Phi + SampleTrimmedLogistic(u[0][1], s, -dr::Pi<ScalarFloat>, dr::Pi<ScalarFloat>), 2 * dr::Pi<ScalarFloat> * u[0][1]);
+        dphi = dr::select(p < pMax, Phi + SampleTrimmedLogistic(u[0][1], s, -dr::Pi<ScalarFloat>, dr::Pi<ScalarFloat>), 2 * dr::Pi<ScalarFloat> * u[0][1]);
 
         /******* for different dimension  ********/
 
@@ -348,10 +348,10 @@ public:
         dr::Array<Float, pMax + 1> apPdf = ComputeApPdf(cosThetaI, si, active);
 
         /******* for different lobe  ********/
-        // apPdf[0] = 0;
+        // apPdf[0] = 1;
         // apPdf[1] = 0;
         // apPdf[2] = 0;
-        // apPdf[3] = 1;
+        // apPdf[3] = 0;
         /******* for different lobe  ********/
 
         // std::cout<<apPdf[0]<<" "<<apPdf[1]<<" "<<apPdf[2]<<" "<<apPdf[3]<<std::endl;
@@ -384,10 +384,10 @@ public:
             /******* for different dimension  ********/
 
             // uniform Np
-            _pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) * apPdf[p] * (1 / (2 * dr::Pi<ScalarFloat>)); 
+            // _pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) * apPdf[p] * (1 / (2 * dr::Pi<ScalarFloat>)); 
 
             // importance sampling
-            // _pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) * apPdf[p] * Np(phi, p, s, gammaI, gammaT);
+            _pdf += Mp(cosThetaO, cosThetaIp, sinThetaO, sinThetaIp, v[p]) * apPdf[p] * Np(phi, p, s, gammaI, gammaT);
 
             /******* for different dimension  ********/
         }
@@ -574,6 +574,7 @@ private:
 
         // map dphi to [-pi, pi]
         dphi = angleMap(dphi);
+        // std::cout<<"dphi: "<<dphi<<" "<<TrimmedLogistic(dphi, s, -dr::Pi<Float>, dr::Pi<Float>)<<std::endl;
         return TrimmedLogistic(dphi, s, -dr::Pi<Float>, dr::Pi<Float>);
     }
 
